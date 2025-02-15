@@ -21,8 +21,9 @@ st.set_page_config(
 # Directory of this script: e.g. /Users/.../economato/app
 BASE_DIR = Path(__file__).parent
 
-# Excel file path: /Users/.../economato/app/data/master_dataset.xlsx
-DATA_FILE = BASE_DIR / "data" / "master_dataset.xlsx"
+# Excel file path: /Users/stefanodellapietra/Desktop/Projects/Development/economato/app/data/master_dataset.xlsx
+DATA_FILE = Path("/Users/stefanodellapietra/Desktop/Projects/Development/economato/app/data/master_dataset.xlsx")
+# app/data/master_dataset.xl
 
 def show_debug_info():
     """Optional debug info in the sidebar."""
@@ -53,43 +54,42 @@ def load_data():
 
     try:
         df = pd.read_excel(DATA_FILE, engine="openpyxl")
-
-        # Rename columns if they exist
-        rename_dict = {
-            'Dipartimento': 'reparto',
-            'Descrizione': 'descrizione',
-            'Quantita': 'quantita',
-            'Euro_Medio': 'euro_medio',
-            'Mese': 'mese',
-            'Anno': 'anno',
-            'Costo_Totale': 'costo'
-        }
-        df.rename(columns=rename_dict, inplace=True, errors='ignore')
-
-        # Convert mese to string to handle 'Evento' or other text
-        if 'mese' in df.columns:
-            df['mese'] = df['mese'].astype(str)
-            # Filter out rows that aren't numeric months
-            df = df[df['mese'].str.isnumeric()]
-            df['mese'] = df['mese'].astype(int)
-
-        # Convert numeric fields
-        numeric_cols = ['quantita', 'euro_medio', 'costo']
-        for col in numeric_cols:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-
-        # Clean text columns
-        text_cols = ['reparto', 'descrizione']
-        for col in text_cols:
-            if col in df.columns:
-                df[col] = df[col].astype(str).fillna('N/A').str.strip()
-
-        return df
-
     except Exception as e:
-        st.error(f"Errore durante il caricamento dei dati: {e}")
+        print(f"Error reading Excel file: {e}")
         return pd.DataFrame()
+
+    # Rename columns if they exist
+    rename_dict = {
+        'Dipartimento': 'reparto',
+        'Descrizione': 'descrizione',
+        'Quantita': 'quantita',
+        'Euro_Medio': 'euro_medio',
+        'Mese': 'mese',
+        'Anno': 'anno',
+        'Costo_Totale': 'costo'
+    }
+    df.rename(columns=rename_dict, inplace=True, errors='ignore')
+
+    # Convert mese to string to handle 'Evento' or other text
+    if 'mese' in df.columns:
+        df['mese'] = df['mese'].astype(str)
+        # Filter out rows that aren't numeric months
+        df = df[df['mese'].str.isnumeric()]
+        df['mese'] = df['mese'].astype(int)
+
+    # Convert numeric fields
+    numeric_cols = ['quantita', 'euro_medio', 'costo']
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+
+    # Clean text columns
+    text_cols = ['reparto', 'descrizione']
+    for col in text_cols:
+        if col in df.columns:
+            df[col] = df[col].astype(str).fillna('N/A').str.strip()
+
+    return df
 
 # -----------------------------------------------------------------------------
 # MONTHLY ANALYSIS
