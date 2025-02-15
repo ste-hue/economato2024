@@ -1,10 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from datetime import datetime
-import os
 from pathlib import Path
-import calendar
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -20,43 +17,26 @@ st.set_page_config(
 # -----------------------------------------------------------------------------
 # GLOBAL SETTINGS
 # -----------------------------------------------------------------------------
-# BASE_DIR = Path(__file__).parent.absolute()
-# DATA_DIR = BASE_DIR / "data"
-DATA_FILE = Path(__file__).parent / "data" / "master_dataset.xlsx"
 
-# EXCEL_FILENAME = "master_dataset.xlsx"
-# DOCKER_PATH = f"/app/data/{EXCEL_FILENAME}"
-# LOCAL_PATH = str(DATA_DIR / EXCEL_FILENAME)
+# Directory of this script: e.g. /Users/.../economato/app
+BASE_DIR = Path(__file__).parent
 
-
-def get_data_path():
-    # Adjust to point to the local path directly (no secrets check needed).
-    if os.path.exists(LOCAL_PATH):
-        return LOCAL_PATH
-    if os.path.exists(DOCKER_PATH):
-        return DOCKER_PATH
-    st.info("Elaborazione dati in corso...")
-    return LOCAL_PATH
-
-try:
-    FILE_PATH = get_data_path()
-except FileNotFoundError as e:
-    st.error(str(e))
-    FILE_PATH = None
+# Excel file path: /Users/.../economato/app/data/master_dataset.xlsx
+DATA_FILE = BASE_DIR / "data" / "master_dataset.xlsx"
 
 def show_debug_info():
+    """Optional debug info in the sidebar."""
     st.sidebar.write("Debug Info:")
     st.sidebar.write(f"Base Directory: {BASE_DIR}")
-    st.sidebar.write(f"Data Directory: {DATA_DIR}")
-    st.sidebar.write(f"Docker Path: {DOCKER_PATH}")
-    st.sidebar.write(f"Local Path: {LOCAL_PATH}")
-    st.sidebar.write(f"Selected Path: {FILE_PATH}")
-    if FILE_PATH:
-        st.sidebar.write(f"File exists: {os.path.exists(FILE_PATH)}")
-        st.sidebar.write(f"Is file: {os.path.isfile(FILE_PATH)}")
-        st.sidebar.write(f"Directory contents:")
+    st.sidebar.write(f"Data File: {DATA_FILE}")
+    file_exists = DATA_FILE.exists()
+    st.sidebar.write(f"File exists: {file_exists}")
+    if file_exists:
+        st.sidebar.write(f"Is file: {DATA_FILE.is_file()}")
+        st.sidebar.write("Directory contents in /data/:")
         try:
-            st.sidebar.write(os.listdir(DATA_DIR))
+            for item in (DATA_FILE.parent).iterdir():
+                st.sidebar.write("- ", item.name)
         except Exception as e:
             st.sidebar.write(f"Error listing directory: {str(e)}")
 
@@ -65,18 +45,57 @@ def show_debug_info():
 # -----------------------------------------------------------------------------
 @st.cache_data
 def load_data():
+    """Load and clean the Excel dataset."""
+    # Check if the file is actually there
     if not DATA_FILE.exists():
         st.error(f"File not found: {DATA_FILE}")
         return pd.DataFrame()
+
     try:
         df = pd.read_excel(DATA_FILE, engine="openpyxl")
-        ...
+
+        # Rename columns if they exist
+        rename_dict = {
+            'Dipartimento': 'reparto',
+            'Descrizione': 'descrizione',
+            'Quantita': 'quantita',
+            'Euro_Medio': 'euro_medio',
+            'Mese': 'mese',
+            'Anno': 'anno',
+            'Costo_Totale': 'costo'
+        }
+        df.rename(columns=rename_dict, inplace=True, errors='ignore')
+
+        # Convert mese to string to handle 'Evento' or other text
+        if 'mese' in df.columns:
+            df['mese'] = df['mese'].astype(str)
+            # Filter out rows that aren't numeric months
+            df = df[df['mese'].str.isnumeric()]
+            df['mese'] = df['mese'].astype(int)
+
+        # Convert numeric fields
+        numeric_cols = ['quantita', 'euro_medio', 'costo']
+        for col in numeric_cols:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+
+        # Clean text columns
+        text_cols = ['reparto', 'descrizione']
+        for col in text_cols:
+            if col in df.columns:
+                df[col] = df[col].astype(str).fillna('N/A').str.strip()
+
         return df
+
     except Exception as e:
         st.error(f"Errore durante il caricamento dei dati: {e}")
         return pd.DataFrame()
-    
+
+# -----------------------------------------------------------------------------
+# MONTHLY ANALYSIS
+# -----------------------------------------------------------------------------
 def create_monthly_analysis(df):
+    """Generate monthly bar charts and metrics."""
     st.header("📅 Analisi Mensile")
     
     mesi_italiani = {
@@ -92,15 +111,20 @@ def create_monthly_analysis(df):
         'reparto': 'nunique'
     }).reset_index()
     
-    monthly_metrics.columns = ['Mese', 'Costo Totale', 'Quantità', 'Prodotti Unici', 'Reparti Attivi']
+    monthly_metrics.columns = [
+        'Mese', 'Costo Totale', 'Quantità',
+        'Prodotti Unici', 'Reparti Attivi'
+    ]
     monthly_metrics['Mese'] = monthly_metrics['Mese'].map(mesi_italiani)
     
+    # Plotly subplots
     fig = make_subplots(
         rows=2, cols=1,
         subplot_titles=('Andamento Costi Mensili', 'Andamento Quantità Mensili'),
         vertical_spacing=0.12
     )
     
+    # Bar for Costo
     fig.add_trace(
         go.Bar(
             x=monthly_metrics['Mese'],
@@ -111,6 +135,7 @@ def create_monthly_analysis(df):
         row=1, col=1
     )
     
+    # Bar for Quantità
     fig.add_trace(
         go.Bar(
             x=monthly_metrics['Mese'],
@@ -124,6 +149,7 @@ def create_monthly_analysis(df):
     fig.update_layout(height=800, showlegend=False)
     st.plotly_chart(fig, use_container_width=True)
     
+    # Metrics
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
@@ -147,18 +173,20 @@ def create_monthly_analysis(df):
             f"{monthly_metrics['Reparti Attivi'].mean():,.0f}"
         )
     
+    # Monthly details table
     st.subheader("Dettaglio Mensile")
     monthly_metrics['Costo Totale'] = monthly_metrics['Costo Totale'].apply(lambda x: f"€ {x:,.2f}")
     monthly_metrics['Quantità'] = monthly_metrics['Quantità'].apply(lambda x: f"{x:,.0f}")
     st.dataframe(monthly_metrics, use_container_width=True)
     
+    # Top products per selected month
     st.subheader("Top Prodotti per Mese")
     selected_month = st.selectbox(
         "Seleziona Mese",
         options=monthly_metrics['Mese'].tolist()
     )
-    
-    month_num = [k for k, v in mesi_italiani.items() if v == selected_month][0]
+    # Reverse mapping
+    month_num = {v: k for k, v in mesi_italiani.items()}[selected_month]
     month_data = df[df['mese'] == month_num]
     
     top_products = month_data.groupby('descrizione').agg({
@@ -176,6 +204,9 @@ def create_monthly_analysis(df):
     )
     st.plotly_chart(fig_products, use_container_width=True)
 
+# -----------------------------------------------------------------------------
+# MAIN APP
+# -----------------------------------------------------------------------------
 def main():
     st.title("📊 Dashboard Consumi Economato")
     st.markdown(
@@ -183,16 +214,20 @@ def main():
         "unificati, con la possibilità di filtrare, analizzare e scaricare i dati."
     )
 
+    # Load data
     df = load_data()
     if df.empty:
         st.warning("Nessun dato disponibile nel file master_dataset.xlsx.")
         return
 
+    # Sidebar filters
     st.sidebar.header("🔎 Filtri")
-
+    
     if 'reparto' in df.columns:
         reparti = ["Tutti"] + sorted(df['reparto'].dropna().unique().tolist())
         selected_reparto = st.sidebar.selectbox("Seleziona Reparto", reparti)
+    else:
+        selected_reparto = "Tutti"
 
     if 'mese' in df.columns:
         mesi = ["Tutti"] + sorted(df['mese'].dropna().astype(str).unique().tolist())
@@ -200,6 +235,7 @@ def main():
     else:
         selected_mese = "Tutti"
 
+    # Apply filters
     filtered_df = df.copy()
     if selected_reparto != "Tutti":
         filtered_df = filtered_df[filtered_df['reparto'] == selected_reparto]
@@ -210,6 +246,7 @@ def main():
         st.warning("Nessun dato corrisponde ai filtri selezionati.")
         return
 
+    # Overview metrics
     col1, col2, col3 = st.columns(3)
     with col1:
         total_cost = filtered_df['costo'].sum()
@@ -223,6 +260,7 @@ def main():
 
     st.divider()
 
+    # Top 10 cost
     st.subheader("Top 10 Prodotti per Costo")
     top_cost = (
         filtered_df.groupby("descrizione")["costo"]
@@ -244,6 +282,7 @@ def main():
     else:
         st.info("Nessun prodotto presente per il filtro selezionato.")
 
+    # Top 10 quantity
     st.subheader("Top 10 Prodotti per Quantità")
     top_qty = (
         filtered_df.groupby("descrizione")["quantita"]
@@ -267,6 +306,7 @@ def main():
 
     st.divider()
 
+    # Reparto analysis
     if not filtered_df.empty:
         st.subheader("Analisi per Reparto")
         dept_metrics = filtered_df.groupby('reparto').agg({
@@ -275,12 +315,16 @@ def main():
             'descrizione': 'nunique'
         }).reset_index()
         
-        dept_metrics.columns = ['Reparto', 'Costo Totale', 'Quantità Totale', 'Prodotti Unici']
+        dept_metrics.columns = [
+            'Reparto', 'Costo Totale',
+            'Quantità Totale', 'Prodotti Unici'
+        ]
         dept_metrics['Costo Totale'] = dept_metrics['Costo Totale'].apply(lambda x: f"€ {x:,.2f}")
         dept_metrics['Quantità Totale'] = dept_metrics['Quantità Totale'].apply(lambda x: f"{x:,.0f}")
         
         st.dataframe(dept_metrics, use_container_width=True)
 
+        # Bar chart cost by Reparto
         fig_dept = px.bar(
             filtered_df.groupby('reparto')['costo'].sum().reset_index(),
             x='reparto',
@@ -290,15 +334,18 @@ def main():
         )
         st.plotly_chart(fig_dept, use_container_width=True)
 
+    # Monthly analysis
     if not filtered_df.empty:
         st.divider()
         create_monthly_analysis(filtered_df)
 
+    # Final dataframe
     st.subheader("Dati Filtrati")
     show_columns = ["reparto", "descrizione", "quantita", "euro_medio", "costo", "mese"]
     valid_cols = [col for col in show_columns if col in filtered_df.columns]
     st.dataframe(filtered_df[valid_cols], use_container_width=True)
 
+    # CSV download
     csv_data = filtered_df.to_csv(index=False).encode('utf-8')
     st.download_button(
         label="Scarica Dati (CSV)",
@@ -307,7 +354,7 @@ def main():
         mime="text/csv"
     )
 
-    # Debug section at the very bottom of sidebar
+    # Debug in sidebar
     st.sidebar.markdown("<br>" * 10, unsafe_allow_html=True)
     with st.sidebar.expander("🛠️ Debug", expanded=False):
         if st.checkbox("Mostra informazioni di debug", False):
