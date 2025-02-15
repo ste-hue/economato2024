@@ -20,14 +20,13 @@ st.set_page_config(
 # -----------------------------------------------------------------------------
 # GLOBAL SETTINGS
 # -----------------------------------------------------------------------------
-BASE_DIR = Path(__file__).parent.absolute()
+# BASE_DIR = Path(__file__).parent.absolute()
+# DATA_DIR = BASE_DIR / "data"
+DATA_FILE = Path(__file__).parent / "data" / "master_dataset.xlsx"
 
-# Remove st.secrets line and directly set DATA_DIR
-DATA_DIR = Path("/Users/stefanodellapietra/Desktop/Projects/Development/economato/app/data")
-
-EXCEL_FILENAME = "master_dataset.xlsx"
-DOCKER_PATH = f"/app/data/{EXCEL_FILENAME}"
-LOCAL_PATH = str(DATA_DIR / EXCEL_FILENAME)
+# EXCEL_FILENAME = "master_dataset.xlsx"
+# DOCKER_PATH = f"/app/data/{EXCEL_FILENAME}"
+# LOCAL_PATH = str(DATA_DIR / EXCEL_FILENAME)
 
 
 def get_data_path():
@@ -66,44 +65,17 @@ def show_debug_info():
 # -----------------------------------------------------------------------------
 @st.cache_data
 def load_data():
+    if not DATA_FILE.exists():
+        st.error(f"File not found: {DATA_FILE}")
+        return pd.DataFrame()
     try:
-        df = pd.read_excel(FILE_PATH, engine='openpyxl')
-        
-        rename_dict = {
-            'Dipartimento': 'reparto',
-            'Descrizione': 'descrizione',
-            'Quantita': 'quantita',
-            'Euro_Medio': 'euro_medio',
-            'Mese': 'mese',
-            'Anno': 'anno',
-            'Costo_Totale': 'costo'
-        }
-        df.rename(columns=rename_dict, inplace=True, errors='ignore')
-
-        # Convert mese to string to handle 'Evento'
-        if 'mese' in df.columns:
-            df['mese'] = df['mese'].astype(str)
-            # Filter out 'Evento' rows for monthly analysis
-            df = df[df['mese'].str.isnumeric()]
-            df['mese'] = df['mese'].astype(int)
-
-        # Convert numeric fields
-        numeric_cols = ['quantita', 'euro_medio', 'costo']
-        for col in numeric_cols:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-
-        text_cols = ['reparto', 'descrizione']
-        for col in text_cols:
-            if col in df.columns:
-                df[col] = df[col].astype(str).fillna('N/A').str.strip()
-
+        df = pd.read_excel(DATA_FILE, engine="openpyxl")
+        ...
         return df
-
     except Exception as e:
         st.error(f"Errore durante il caricamento dei dati: {e}")
         return pd.DataFrame()
-
+    
 def create_monthly_analysis(df):
     st.header("📅 Analisi Mensile")
     

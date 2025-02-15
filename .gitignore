@@ -54,6 +54,7 @@ docker-compose.override.yml
 
 # Data and Logs
 !data/01_raw_data/
+!data/master_dataset.xlsx
 data/*
 !data/.gitkeep
 logs/
