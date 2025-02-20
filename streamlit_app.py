@@ -21,7 +21,7 @@ st.set_page_config(
 # Directory of this script: e.g. /Users/.../economato/app
 BASE_DIR = Path(__file__).parent
 
-# Excel file path: /Users/stefanodellapietra/Desktop/Projects/Development/economato/app/data/master_dataset.xlsx
+# Excel file path: 
 DATA_FILE = Path("data/master_dataset.xlsx")# app/data/master_dataset.xl
 
 def show_debug_info():
