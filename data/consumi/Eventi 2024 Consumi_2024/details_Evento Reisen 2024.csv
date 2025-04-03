@@ -1,0 +1,10 @@
+Reparto,Classe,Categoria,Codice,Descrizione,U.M.A.,U.M.C.,Coeff Conv,Euro Medio,Quantita,Primo Per.,Sec. Per.
+EVENTORE,,,,,,,,,,100.1,100.1
+,FOOD - ,,,,,,,,,100.1,100.1
+,,CARNEROS - ,,,,,,,,64.5,64.5
+,,,FOO.CRO.00002,LONZA DI MAIALE,KG,KG,1.0,7.6894,12.9,64.5,64.5
+,,FARINA - ,,,,,,,,22.0,22.0
+,,,FOO.FAR.00003,FARINA DI MANDORLE 1KG,KG,GR,1000.0,11.0,2,22.0,22.0
+,,PASTAFRE - ,,,,,,,,13.6,13.6
+,,,FOO.PST.00014,GNOCCHI DI PATATE KG 1,KG,GR,1000.0,2.2667,6,13.6,13.6
+,,,,,,,,,TOTALE,100.1,100.1
